@@ -1,0 +1,123 @@
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+
+  pull_request:
+    branches: [main]
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  repository:
+    name: Repository Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check required files
+        run: |
+          test -f README.md
+          test -f .gitignore
+          test -f LICENSE
+
+      - name: Validate JSON files
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          files = list(Path(".").rglob("*.json"))
+
+          for file in files:
+              if any(part in {
+                  "node_modules", ".git", ".venv", "dist"
+              } for part in file.parts):
+                  continue
+
+              with file.open(encoding="utf-8") as f:
+                  json.load(f)
+
+              print(f"Valid JSON: {file}")
+
+          print("JSON validation passed")
+          PY
+
+  backend:
+    name: Backend Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check Python syntax
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+
+          files = list(Path(".").rglob("*.py"))
+
+          for file in files:
+              if any(part in {
+                  ".git", ".venv", "node_modules"
+              } for part in file.parts):
+                  continue
+
+              ast.parse(file.read_text(encoding="utf-8"))
+              print(f"Valid Python: {file}")
+
+          print("Python syntax check passed")
+          PY
+
+      - name: Run backend tests if available
+        run: |
+          if [ -f backend/requirements.txt ]; then
+            python -m pip install -r backend/requirements.txt
+            python -m pip install pytest
+          fi
+
+          if [ -d backend/tests ] && \
+             find backend/tests -name "test_*.py" | grep -q .; then
+            python -m pytest backend/tests -q
+          else
+            echo "No backend tests yet"
+          fi
+
+  frontend:
+    name: Frontend Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install and build frontend
+        working-directory: ./frontend
+        if: hashFiles('frontend/package.json') != ''
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+          npm run build
