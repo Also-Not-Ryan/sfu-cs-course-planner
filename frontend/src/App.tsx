@@ -10,6 +10,7 @@ import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { Placeholder } from "./pages/Placeholder";
 // import { logoutUser } from "#api/AuthApi";
 import { useAuth } from "#contexts/AuthContext";
+import { usePlan } from "#services/hooks/usePlan";
 
 const concentrations = [
   "Artificial Intelligence",
@@ -33,9 +34,7 @@ function Dashboard() {
   );
   const [years, setYears] = useState([1, 2, 3, 4]);
   const [selectedTerm, setSelectedTerm] = useState(termKey(1, "Fall"));
-  const [plannedCourses, setPlannedCourses] = useState<
-    Record<string, Course[]>
-  >({});
+  const { plannedCourses, addCourse, status } = usePlan();
 
   const navigate = useNavigate();
   const { currentUser, clearCurrentUser } = useAuth();
@@ -44,14 +43,7 @@ function Dashboard() {
     .flat()
     .reduce((total, course) => total + course.credits, 0);
 
-  const handleSelectCourse = (course: Course) => {
-    setPlannedCourses((current) => {
-      const currentTermCourses = current[selectedTerm] ?? [];
-      if (currentTermCourses.some((planned) => planned.id === course.id))
-        return current;
-      return { ...current, [selectedTerm]: [...currentTermCourses, course] };
-    });
-  };
+  const handleSelectCourse = (course: Course) => addCourse(course, selectedTerm);
 
   const handleLogout = async () => {
     try {
@@ -84,7 +76,7 @@ function Dashboard() {
         <div className="topbar-actions">
           <span className="save-state">
             <span aria-hidden="true" />
-            Draft plan
+            {status}
             {currentUser ? (
               <button type="button" onClick={handleLogout}>
                 Log out
